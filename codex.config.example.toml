@@ -1,0 +1,15 @@
+model = "deepseek-v4-pro"
+model_provider = "thirdparty_switcher"
+model_context_window = 1048576
+
+[model_providers.thirdparty_switcher]
+name = "Third-Party Switcher"
+base_url = "http://127.0.0.1:5055/v1"
+wire_api = "responses"
+show_in_picker = true
+
+[model_providers.thirdparty_switcher.auth]
+command = "/Users/apexmini/.local/bin/codex-switcher"
+args = ["auth-token"]
+timeout_ms = 5000
+refresh_interval_ms = 300000
