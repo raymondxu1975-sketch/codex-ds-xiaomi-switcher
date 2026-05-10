@@ -19,10 +19,18 @@ from flask import Flask, Response, jsonify, request
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 CODEX_CONFIG_PATH = os.environ.get("CODEX_CONFIG_PATH", os.path.expanduser("~/.codex/config.toml"))
-DEFAULT_CODEX_MODEL_CATALOG_PATH = os.environ.get(
-    "CODEX_MODEL_CATALOG_PATH",
-    os.path.join(BASE_DIR, "model-catalogs", "ds-xiaomi-1m.example.json"),
-)
+DEFAULT_CODEX_MODEL_CATALOG_PATH = os.environ.get("CODEX_MODEL_CATALOG_PATH", "")
+if not DEFAULT_CODEX_MODEL_CATALOG_PATH:
+    preferred_catalog_paths = [
+        os.path.expanduser("~/.codex/model-catalogs/ds-xiaomi-1m.json"),
+        os.path.join(BASE_DIR, "model-catalogs", "ds-xiaomi-1m.example.json"),
+    ]
+    for candidate_path in preferred_catalog_paths:
+        if os.path.exists(candidate_path):
+            DEFAULT_CODEX_MODEL_CATALOG_PATH = candidate_path
+            break
+    else:
+        DEFAULT_CODEX_MODEL_CATALOG_PATH = preferred_catalog_paths[-1]
 AUDIT_LOG_PATH = os.environ.get(
     "SWITCHER_AUDIT_LOG_PATH",
     os.path.join(BASE_DIR, "runtime_logs", "requests.jsonl"),
