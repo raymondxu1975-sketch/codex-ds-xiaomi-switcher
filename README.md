@@ -128,6 +128,22 @@ python3 /Users/apexmini/.codex/hooks/capture_tool.py
 
 That hook writes Bash tool results into `/Users/apexmini/.openclaw/workspace/runtime/knowledge.db` for OpenClaw knowledge capture. It is independent from the DeepSeek/Xiaomi switcher and does not control provider routing.
 
+Detailed behavior of the `capture_tool.py` hook
+
+- Purpose: capture `bash` tool outputs invoked by Codex's PostToolUse hook, produce a safe summary/preview, and store it in a local OpenClaw SQLite knowledge DB for later retrieval. The hook is intended for local knowledge capture and debugging, not for forwarding secrets or modifying provider routing.
+- Who calls it: Codex Desktop (via the configured hooks JSON) triggers PostToolUse hooks after a tool call completes. The hook receives JSON on stdin describing the tool invocation (tool name, command, cwd, tool_response).
+- What it stores: the hook extracts the command and a truncated preview of stdout/stderr (up to a configured max length), generates a record with a unique id and timestamp, and inserts it into the `openclaw_memory` table and the `openclaw_memory_fts` index in `knowledge.db`.
+- Where it stores it: by default `DB_PATH` in the hook is set to `/Users/apexmini/.openclaw/workspace/runtime/knowledge.db` (see the script for the exact path). The README does not copy outputs; instead the audit log (`runtime_logs/requests.jsonl`) records a reference id or summary so the two stores can be correlated.
+- What it skips and why: the hook uses simple heuristics to skip noisy/short commands (e.g. `echo`, `ls`, `pwd`, very short commands) to avoid clutter; it also truncates long outputs. It does not attempt to capture or log environment secrets (it avoids reading `.env`) and will not write keys into the DB.
+- Safety notes: the hook runs locally and is independent from upstream routing. By default it will not execute arbitrary code beyond what the tool call provided; enabling additional local execution hooks or broader command handling should be done only with explicit trust and tightened white-lists. If you want stricter masking of possible sensitive substrings (e.g. long base64/hex tokens), modify the hook to apply extra masking before writing.
+
+How to disable or manage the hook
+
+- Disable: remove or comment out the PostToolUse entry in `/Volumes/Ex/ai_workspace/library_data/codex/.codex/hooks.json` or move `capture_tool.py` out of the configured path.
+- Tune: edit `capture_tool.py`'s `SKIP_PREFIXES`, `MIN_COMMAND_LEN`, and `MAX_OUTPUT_LEN` constants to change noise filtering and truncation behavior.
+- Access control: ensure `knowledge.db` is stored in a directory with restricted filesystem permissions if audit outputs are to be protected.
+
+
 ## Notes
 
 `DASHSCOPE_API_KEY` is unrelated to this switcher. The switcher only needs `DEEPSEEK_API_KEY` and `XIAOMI_API_KEY`, and only the local proxy reads them from `.env`.
