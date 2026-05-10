@@ -97,6 +97,8 @@ Use the proxy root `http://127.0.0.1:5055/v1` as the custom provider base URL. T
 
 For Codex Desktop, prefer the command-backed auth configuration in [codex.config.example.toml](codex.config.example.toml). That avoids relying on Finder-launched app environment variables.
 
+The verified 1M setup also needs a custom model catalog such as [model-catalogs/ds-xiaomi-1m.example.json](model-catalogs/ds-xiaomi-1m.example.json). In the real Codex config, `model_catalog_json` must be an absolute path.
+
 This setup also installs a direct launcher at `/Users/apexmini/.local/bin/codex-switcher`, so normal use does not need a `python` prefix.
 
 To switch Codex Desktop between the built-in GPT route and the local DeepSeek/Xiaomi route, use:
@@ -109,6 +111,43 @@ codex-switcher use status
 ```
 
 After running `use gpt`, `use deepseek`, or `use xiaomi`, fully quit and reopen `/Volumes/Ex/Applications/Codex.app`.
+
+Starting in this revision, `codex-switcher use deepseek` and `codex-switcher use xiaomi` write all three settings that were required to make a brand new Codex Desktop thread show and use the 1M budget:
+
+- `model_context_window = 1048576`
+- `model_auto_compact_token_limit = 1000000`
+- `model_catalog_json = "/absolute/path/to/model-catalogs/ds-xiaomi-1m.example.json"`
+
+The script also leaves GPT mode clean by removing those switcher-specific overrides when you run `codex-switcher use gpt`.
+
+## Why Codex Desktop showed 258K instead of 1M
+
+The root cause was not the proxy itself. Codex Desktop was falling back to built-in model metadata for the UI and thread bootstrap path.
+
+In the local Codex model cache, the built-in `gpt-5.4` entry reported:
+
+- `context_window = 272000`
+- `effective_context_window_percent = 95`
+
+That yields `272000 * 0.95 = 258400`, which is exactly why the desktop UI showed about `258K`.
+
+Changing only `model_context_window = 1048576` was not enough. The effective 1M result required two more conditions:
+
+- raise the compaction threshold with `model_auto_compact_token_limit = 1000000`
+- point Codex Desktop at a custom model catalog where `deepseek-v4-pro`, `mimo-v2.5-pro`, and `gpt-5.4` all advertise `context_window = 1048576`, `max_context_window = 1048576`, and `effective_context_window_percent = 100`
+
+One more behavioral detail mattered: existing threads kept their old metadata. The 1M window appeared on a brand new Codex Desktop thread after the updated config and model catalog were in place.
+
+## 1M checklist
+
+1. Start the local proxy on `127.0.0.1:5055`.
+2. Point Codex Desktop at the custom provider from [codex.config.example.toml](codex.config.example.toml).
+3. Make `model_catalog_json` an absolute path to [model-catalogs/ds-xiaomi-1m.example.json](model-catalogs/ds-xiaomi-1m.example.json) or your own catalog derived from it.
+4. Run `codex-switcher use deepseek` or `codex-switcher use xiaomi`.
+5. Fully quit and reopen Codex Desktop.
+6. Start a brand new thread and verify the context display is near `1M` instead of `258K`.
+
+If you inspect `codex-switcher use status`, you should now see `model_context_window`, `model_auto_compact_token_limit`, and `model_catalog_json` together.
 
 To prove a specific Codex Desktop reply used DeepSeek, switch to `deepseek`, reopen Codex Desktop, send a prompt with a unique marker such as `Reply with exactly: probe-20260509-abc123`, then run `codex-switcher audit-tail --lines 10` and confirm the newest entries show:
 

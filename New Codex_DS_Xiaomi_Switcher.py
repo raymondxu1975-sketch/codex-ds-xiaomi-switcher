@@ -19,6 +19,10 @@ from flask import Flask, Response, jsonify, request
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 CODEX_CONFIG_PATH = os.environ.get("CODEX_CONFIG_PATH", os.path.expanduser("~/.codex/config.toml"))
+DEFAULT_CODEX_MODEL_CATALOG_PATH = os.environ.get(
+    "CODEX_MODEL_CATALOG_PATH",
+    os.path.join(BASE_DIR, "model-catalogs", "ds-xiaomi-1m.example.json"),
+)
 AUDIT_LOG_PATH = os.environ.get(
     "SWITCHER_AUDIT_LOG_PATH",
     os.path.join(BASE_DIR, "runtime_logs", "requests.jsonl"),
@@ -841,6 +845,10 @@ def write_codex_mode(target: str) -> int:
             continue
         if stripped.startswith("model_context_window = "):
             continue
+        if stripped.startswith("model_auto_compact_token_limit = "):
+            continue
+        if stripped.startswith("model_catalog_json = "):
+            continue
         preserved_lines.append(line)
 
     new_head = []
@@ -852,6 +860,8 @@ def write_codex_mode(target: str) -> int:
                 'model = "deepseek-v4-pro"',
                 'model_provider = "ds_xiaomi_switcher"',
                 'model_context_window = 1048576',
+                'model_auto_compact_token_limit = 1000000',
+                f'model_catalog_json = {json.dumps(DEFAULT_CODEX_MODEL_CATALOG_PATH)}',
             ]
         )
     elif target == "xiaomi":
@@ -860,6 +870,8 @@ def write_codex_mode(target: str) -> int:
                 'model = "mimo-v2.5-pro"',
                 'model_provider = "ds_xiaomi_switcher"',
                 'model_context_window = 1048576',
+                'model_auto_compact_token_limit = 1000000',
+                f'model_catalog_json = {json.dumps(DEFAULT_CODEX_MODEL_CATALOG_PATH)}',
             ]
         )
     else:
@@ -879,6 +891,8 @@ def write_codex_mode(target: str) -> int:
 
     print(f"Switched Codex default to: {target}")
     print(f"Config path: {CODEX_CONFIG_PATH}")
+    if target in {"deepseek", "xiaomi"}:
+        print(f"Model catalog path: {DEFAULT_CODEX_MODEL_CATALOG_PATH}")
     return 0
 
 
@@ -890,6 +904,8 @@ def print_codex_mode_status() -> int:
         "model": data.get("model"),
         "model_provider": data.get("model_provider"),
         "model_context_window": data.get("model_context_window"),
+        "model_auto_compact_token_limit": data.get("model_auto_compact_token_limit"),
+        "model_catalog_json": data.get("model_catalog_json"),
     }, ensure_ascii=False))
     return 0
 
